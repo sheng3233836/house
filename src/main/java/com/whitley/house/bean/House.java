@@ -6,12 +6,18 @@ import lombok.Data;
 
 import org.apache.commons.lang3.math.NumberUtils;
 
+import com.google.common.collect.ImmutableMap;
+
 /**
  * @author yuanxin
  * @date 2022/8/24
  */
 @Data
 public class House {
+    public static final ImmutableMap<String, String> REGION_MAP = ImmutableMap.of(
+            "chaoyang", "朝阳区",
+            "tongzhou","通州区");
+
     private String houseCode;
     private String url;
     private String city;

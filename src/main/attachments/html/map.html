@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <title>点标记添加点击事件</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css"/>
+    <script src="https://apps.bdimg.com/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src="https://a.amap.com/jsapi_demos/static/demo-center/js/demoutils.js"></script>
+    <script type="text/javascript" src="https://cache.amap.com/lbs/static/addToolbar.js"></script>
+    <style>
+        body, html, #container {
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            font-size: 14px;
+            font-family: "微软雅黑";
+        }
+
+        .amap-icon img,
+        .amap-marker-content img{
+            width: 25px;
+            height: 34px;
+        }
+
+        .input-card{
+            width: 18rem;
+            z-index: 170;
+        }
+
+        .input-card .btn{
+            margin-right: .8rem;
+        }
+
+        .input-card .btn:last-child{
+            margin-right: 0;
+        }
+        .amap-icon img {
+            width: 25px;
+            height: 34px;
+        }
+        .amap-marker-label{
+            border: 0;
+            background-color: transparent;
+        }
+        .info{
+            position: relative;
+            margin:0;
+            top: 0;
+            right: 0;
+            min-width: 0;
+        }
+        .amap-info-content{
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .total-price{
+            font-size: 16px;
+            color: #fe615a;
+            letter-spacing: 0;
+            line-height: 16px;
+            margin-right: 7px;
+        }
+        .first-price{
+            font-size: 16px;
+            color: #fe615a;
+            letter-spacing: 0;
+            line-height: 16px;
+            margin-right: 7px;
+        }
+        .price{
+            font-size: 11px;
+            color: #999;
+            letter-spacing: 0;
+            line-height: 11px;
+        }
+        .house-info{
+            font-size: 12px;
+        }
+        ul{
+            list-style: none;
+            margin: 0;
+        }
+        li {
+            margin-left: -45px;
+        }
+    </style>
+    <script type="text/javascript">
+        window._AMapSecurityConfig = {
+            securityJsCode:'申请的安全密钥',
+        }
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=申请的key值&plugin=AMap.Geocoder"></script>
+</head>
+<body>
+<div id="container"></div>
+<div class="input-card" style='width:28rem;'>
+    <input type="file" id="fileInput" accept=".json">
+</div>
+</body>
+<script type="text/javascript">
+    var map = new AMap.Map('container', {
+        zoom:13,
+        center: [116.397428, 39.90923],
+        resizeEnable: true
+    });
+    // 初始化标记信息
+    var geocoder = new AMap.Geocoder({
+        // city 指定进行编码查询的城市，支持传入城市名、adcode 和 citycode
+        city: '010'
+    });
+
+    document.getElementById('fileInput').addEventListener('change', function selectedFileChanged() {
+        if (this.files.length === 0) {
+            console.log('请选择文件！');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function fileReadCompleted() {
+            // 当读取完成时，内容只在`reader.result`中
+            var result =  JSON.parse(reader.result);
+            console.log('文件' + result);
+            for (var i = 0; i < result.length; i += 10) {
+                refreshMap(result.slice(i, i + 10));
+            }
+        };
+        reader.readAsText(this.files[0]);
+    });
+
+    function refreshMap(json) {
+        var addresses = [];
+        json.forEach(function(item) {
+            addresses.push(item.community)
+        });
+        console.log('地址：' + addresses);
+        geocoder.getLocation(addresses, function(status, result) {
+            if (status === 'complete' && result.geocodes.length) {
+                for (var i = 0; i < result.geocodes.length; i += 1) {
+                    if (result.geocodes[i]) {
+                        json[i]['position'] = result.geocodes[i].location;
+                    } else {
+                        console.log('位置获取失败' + json[i].community);
+                    }
+                }
+                refreshMarkers(json);
+            } else {
+                log.error('根据地址查询位置失败');
+            }
+        });
+    }
+
+
+    // 添加标记
+    function refreshMarkers(markers) {
+        console.log(markers)
+        markers.forEach(function(item) {
+            var marker = new AMap.Marker({
+                map: map,
+                icon: "https://a.amap.com/jsapi_demos/static/demo-center/icons/poi-marker-default.png",
+                position: item.position,
+                offset: new AMap.Pixel(-13, -30)
+            });
+            // 设置标记文本标注
+            marker.setLabel({
+                direction:'right',
+                offset: new AMap.Pixel(10, 0),  //设置文本标注偏移量
+                content: "<div class='info'>"+ item.community.substring(3) +"<br/><span style=\"color:rgba(133,144,166,.88)\">"+ item.unitPrice +"平/米</span><br/><b>"+item.size+"</b>套 </div>", //设置文本标注内容
+            });
+            // 设置标记点击窗体
+            marker.on('click', function openInfo() {
+                //构建信息窗体中显示的内容
+                var info = [];
+                info.push("<div><div><img style=\"float:left;\" src=\" https://webapi.amap.com/images/autonavi.png \"/></div><ul>");
+                for (var i = 0; i < item.houses.length; i += 1) {
+                    var house = item.houses[i];
+                    info.push("<li><div style=\"padding:0px 0px 0px 4px;\"><b>"+house.title+"</b><a href='"+house.url+"' target='_blank'><img style='width:15px;margin:0px 0px -2px 5px' src='https://f2.kkmh.com/image/220825/L8BSUIzaN.png'/></a>"
+                    +"<div class='house-info'>"+house.houseInfo+"</div>"
+                    +"<div>首付<span class='first-price'>"+house.firstPayFee + "万</span><span class='price'>月供(等额本息):" + house.annuity + "</span></div>"
+                    +"<div><span class='total-price'>"+house.price + "万</span><span class='price'>" + house.unitPrice + "平/米</span></div>"
+                    +"</div></li>");
+                }
+                info.push("</ul></div>");
+                infoWindow = new AMap.InfoWindow({
+                    offset: new AMap.Pixel(10, -25),
+                    content: info.join("<br/>")  //使用默认信息窗体框样式，显示信息内容
+                });
+                infoWindow.open(map, marker.getPosition());
+            });
+        });
+        map.add(markers);
+    }
+</script>
+</html>
