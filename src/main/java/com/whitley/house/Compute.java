@@ -1,5 +1,7 @@
 package com.whitley.house;
 
+import static com.whitley.house.Constants.Region.BJ_REGION_MAP;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -49,7 +51,7 @@ public class Compute {
 
     private static void printResult(List<House> houses) throws IOException {
         BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + "result.json"));
-        Map<String, List<House>> communityMap = houses.stream().collect(Collectors.groupingBy(house -> House.REGION_MAP.get(house.getRegion()) + house.getCommunity()));
+        Map<String, List<House>> communityMap = houses.stream().collect(Collectors.groupingBy(house -> BJ_REGION_MAP.get(house.getRegion()) + house.getCommunity()));
         List<Result> results = new ArrayList<>();
         for (Map.Entry<String, List<House>> entry : communityMap.entrySet()) {
             Result result = new Result();

@@ -14,10 +14,6 @@ import com.google.common.collect.ImmutableMap;
  */
 @Data
 public class House {
-    public static final ImmutableMap<String, String> REGION_MAP = ImmutableMap.of(
-            "chaoyang", "朝阳区",
-            "tongzhou","通州区");
-
     private String houseCode;
     private String url;
     private String city;

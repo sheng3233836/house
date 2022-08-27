@@ -22,7 +22,7 @@ import com.whitley.house.bean.House;
 
 /**
  * 爬虫页面 https://map.lianjia.com/map/110000/ESF
- * 通过地图全域爬取
+ * 通过地图全域爬取 todo
  * @author yuanxin
  * @date 2022/8/24
  */
@@ -36,8 +36,9 @@ public class LianJiaMapClient extends HttpClient {
     }
 
     public static void main(String[] args) throws Exception {
-        Document parse = Jsoup.parse(new File(HOME + "tmp_fang"), "UTF-8");
-        System.out.println(parse);
+        String res = new LianJiaMapClient().get(
+                "https://map.ke.com/proxyApi/i.c-pc-webapi.ke.com/map/bubblelist?cityId=330100&dataSource=ESF&condition=&id=&groupType=district&maxLatitude=30.40462141168829&minLatitude=30.155619117042033&maxLongitude=120.71201890533038&minLongitude=119.60818109466948");
+        System.out.println(res);
     }
 
     private static House buildSimple(Element root) {

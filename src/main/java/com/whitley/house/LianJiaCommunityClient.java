@@ -1,17 +1,17 @@
 package com.whitley.house;
 
 import static com.whitley.house.Constants.City.CITY_MAP;
+import static com.whitley.house.Constants.Region.HZ_REGION_MAP;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.IOException;
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -24,35 +24,110 @@ import org.jsoup.select.Elements;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.TypeReference;
+import com.whitley.house.bean.Community;
 import com.whitley.house.bean.House;
 
 /**
- * 爬虫页面 https://bj.lianjia.com/ershoufang/chaoyang/ie2y2f2dp1sf1a2a3a4bp0ep550/
- * 根据过滤条件在目录页查询，最多只能爬3000条
+ * 爬虫页面 https://hz.lianjia.com/xiaoqu/gongshu/
+ * 通过爬取各个区域全部小区，再通过全部小区爬取房源
  * @author yuanxin
  * @date 2022/8/24
  */
-public class LianJiaClient extends HttpClient {
-    public static final String CITY = "北京";
-    public static final String REGION = "tongzhou";
+public class LianJiaCommunityClient extends HttpClient {
+    public static final String CITY = "杭州";
     public static final String HOME;
     static {
-        String path = LianJiaClient.class.getClassLoader().getResource("").getPath();
+        String path = LianJiaCommunityClient.class.getClassLoader().getResource("").getPath();
         HOME = path.replace("target/classes/", "src/main/resources/");
     }
 
     public static void main(String[] args) throws Exception {
-//        fetchMenu();
-        fetchDetail();
+        fetchCommunity();
+    }
+
+    /**
+     * 爬取小区页，https://hz.lianjia.com/xiaoqu/gongshu/
+     * @throws Exception
+     */
+    public static void fetchCommunity() throws Exception {
+        LianJiaCommunityClient lianJiaClient = new LianJiaCommunityClient();
+        BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + CITY_MAP.get(CITY) + "_Community.txt", true));
+        String condition = "";
+
+        for (String region : HZ_REGION_MAP.keySet()) {
+            int num = 1, page = 1;
+            do {
+                String url = "https://"+ CITY_MAP.get(CITY) +".lianjia.com/xiaoqu/" + region +"/" + condition;
+                if (page > 1) {
+                    url = "https://"+ CITY_MAP.get(CITY) +".lianjia.com/xiaoqu/" + region +"/" + "pg" + page + condition;
+                }
+                String res = lianJiaClient.get(url);
+                Document root = Jsoup.parse(res);
+                Element total = root.select("body > div.content > div.leftContent > div.resultDes.clear > h2 > span").first();
+                int totalNum = NumberUtils.toInt(total.text());
+                num = totalNum - page * 30;
+                System.out.printf("totalNum:%d, curPage:%d, num:%d%n", totalNum, page, num);
+                Elements elements = root.select("body > div.content > div.leftContent > ul > li");
+                for (Element element : elements) {
+                    Community community = buildCommunity(element);
+                    writer.write(JSON.toJSONString(community) + "\n");
+                    writer.flush();
+                    System.out.println(community);
+                }
+                page ++;
+            } while (num > 0);
+        }
+        writer.flush();
+        writer.close();
+    }
+
+    /**
+     * 爬取目录页，https://bj.lianjia.com/ershoufang/chaoyang/ie2y2f2dp1sf1a2a3a4bp0ep550/
+     * @throws Exception
+     */
+    public static void fetchMenu() throws Exception {
+        LianJiaCommunityClient lianJiaClient = new LianJiaCommunityClient();
+        BufferedReader reader = new BufferedReader(new FileReader(new File(HOME + CITY_MAP.get(CITY) +  "_Community.txt")));
+        List<Community> communities = reader.lines().map(line -> JSON.parseObject(line, Community.class)).collect(Collectors.toList());
+        reader.close();
+
+        BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + CITY_MAP.get(CITY) + "_house.txt", true));
+        String condition = "";
+        for (Community community : communities) {
+            int num = 1, page = 1;
+            do {
+                String url = community.getUrl() + condition;
+                if (page > 1) {
+                    url = "https://bj.lianjia.com/ershoufang/" + "pg" + page + condition;
+                }
+                String res = lianJiaClient.get(url);
+                Document root = Jsoup.parse(res);
+                Element total = root.select("#content > div.leftContent > div.resultDes.clear > h2 > span").first();
+                int totalNum = NumberUtils.toInt(total.text());
+                num = totalNum - page * 30;
+                System.out.printf("totalNum:%d, curPage:%d, num:%d%n", totalNum, page, num);
+                Elements elements = root.select("#content > div.leftContent > ul > li > div.info.clear");
+                for (Element element : elements) {
+                    House house = buildSimpleHouse(element);
+                    writer.write(JSON.toJSONString(house) + "\n");
+                    writer.flush();
+                    System.out.println(house);
+                }
+                page ++;
+            } while (num > 0);
+        }
+        writer.flush();
+        writer.close();
     }
 
     public static void fetchDetail() throws Exception {
-        LianJiaClient lianJiaClient = new LianJiaClient();
-        BufferedReader reader = new BufferedReader(new FileReader(new File(HOME + "house.txt")));
+        LianJiaCommunityClient lianJiaClient = new LianJiaCommunityClient();
+        BufferedReader reader = new BufferedReader(new FileReader(new File(HOME + CITY_MAP.get(CITY) +  "_house.txt")));
         List<House> houses = reader.lines().map(line -> JSON.parseObject(line, House.class)).collect(Collectors.toList());
         reader.close();
 
-        BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + "house_detail.txt", true));
+        BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + CITY_MAP.get(CITY) +  "_house_detail.txt", true));
 
         for (House house : houses) {
             String res = lianJiaClient.get(house.getUrl());
@@ -66,37 +141,9 @@ public class LianJiaClient extends HttpClient {
         writer.close();
     }
 
-    /**
-     * 爬取目录页，https://bj.lianjia.com/ershoufang/chaoyang/ie2y2f2dp1sf1a2a3a4bp0ep550/
-     * @throws Exception
-     */
-    public static void fetchMenu() throws Exception {
-        LianJiaClient lianJiaClient = new LianJiaClient();
-        BufferedWriter writer = new BufferedWriter(new FileWriter(HOME + "house.txt", true));
-        String condition = "ie2y2f2dp1sf1a2a3a4bp0ep550";
-        int num = 1, page = 1;
-        do {
-            String url = "https://"+ CITY_MAP.get(CITY)+".lianjia.com/ershoufang/" + REGION +"/" + condition;
-            if (page > 1) {
-                url = "https://"+ CITY_MAP.get(CITY)+ ".lianjia.com/ershoufang/" + REGION +"/" + "pg" + page + condition;
-            }
-            String res = lianJiaClient.get(url);
-            Document root = Jsoup.parse(res);
-            Element total = root.select("#content > div.leftContent > div.resultDes.clear > h2 > span").first();
-            int totalNum = NumberUtils.toInt(total.text());
-            num = totalNum - page * 30;
-            System.out.printf("totalNum:%d, curPage:%d, num:%d%n", totalNum, page, num);
-            Elements elements = root.select("#content > div.leftContent > ul > li > div.info.clear");
-            for (Element element : elements) {
-                House house = buildSimpleHouse(element);
-                writer.write(JSON.toJSONString(house) + "\n");
-                writer.flush();
-                System.out.println(house);
-            }
-            page ++;
-        } while (num > 0);
-        writer.flush();
-        writer.close();
+    private static Community buildCommunity(Element li) {
+        Element element = li.selectFirst("div.xiaoquListItemRight > div.xiaoquListItemSellCount > a");
+        return new Community(element.attributes().get("title"), element.attributes().get("href"));
     }
 
     private static House buildSimpleHouse(Element element) {
@@ -105,7 +152,6 @@ public class LianJiaClient extends HttpClient {
         house.setHouseCode(title.attributes().get("data-housecode"));
         house.setUrl(title.attributes().get("href"));
         house.setCity(CITY);
-        house.setRegion(REGION);
         house.setTitle(title.text());
 
         Element price = element.select("div.priceInfo > div.totalPrice > span").first();
@@ -128,6 +174,7 @@ public class LianJiaClient extends HttpClient {
     private static void buildDetail(Document root, House house) {
         Elements area = root.select("body > div.overview > div.content > div.aroundInfo > div.areaName > span.info");
         house.setAreaDetail(area.text());
+        house.setRegion(area.text().split(" ")[0]);
         // 首付
         Element calculator = root.getElementById("calculator");
         JSONObject jsonObject = JSON.parseObject(calculator.attributes().get("data-shoufu"));
